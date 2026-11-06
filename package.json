@@ -1,0 +1,12 @@
+{
+  "name": "netbridge-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JavaScript checks for the NetBridge educational payment simulation prototype.",
+  "scripts": {
+    "test": "node tests/test_manual_receipt_code.js && node tests/test_offline_totp.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
