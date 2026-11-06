@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -378,14 +377,13 @@
     <p>Local development · No real funds</p>
 </footer>
 
-<script src="{{ url_for('static', filename='vendor/jsQR.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/qrcode.min.js') }}"></script>
 <script src="{{ url_for('static', filename='offline_totp.js') }}"></script>
 <script src="{{ url_for('static', filename='offline_store.js') }}"></script>
 <script src="{{ url_for('static', filename='payment_feedback.js') }}?v=1"></script>
 
     <script src="{{ url_for('static', filename='offline_receipt_code.js') }}?v=2"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=23"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=26"></script>
 <script>
 (() => {
     const status = document.getElementById('connectionStatus');
@@ -407,7 +405,7 @@
 
     async function updateConnection() {
         if (!status) return;
-        if (!navigator.onLine) {
+        if (!navigator.onLine && !/Android/i.test(navigator.userAgent)) {
             status.textContent = 'Simulation Mode · Offline';
             return;
         }
