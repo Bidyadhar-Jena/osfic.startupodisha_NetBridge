@@ -1,0 +1,3 @@
+# Install runtime dependencies plus test tooling:
+-r requirements.txt
+pytest

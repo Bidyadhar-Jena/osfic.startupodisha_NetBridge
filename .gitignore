@@ -1,0 +1,46 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environments and local configuration
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# TLS certificates, private keys, and identity material
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.private
+
+# Runtime state and local databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+data/*.json
+data/*-wal
+data/*-shm
+instance/
+logs/
+
+# Generated/build/editor files
+node_modules/
+dist/
+build/
+.DS_Store
+Thumbs.db
+static/write_test.tmp
