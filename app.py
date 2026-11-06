@@ -1923,7 +1923,8 @@ if __name__ == "__main__":
     # Bind on all interfaces by default so Android devices on the same LAN
     # can reach the HTTPS server. Windows Firewall may still need a private
     # network inbound rule for TCP port 5001.
-    host = os.environ.get("NETBRIDGE_HOST", "0.0.0.0")
+    default_host = "0.0.0.0" if ssl_context is not None else "127.0.0.1"
+    host = os.environ.get("NETBRIDGE_HOST", default_host)
     if host not in {"127.0.0.1", "localhost"} and ssl_context is None:
         raise RuntimeError(
             "Non-local hosting requires a trusted HTTPS certificate. "
