@@ -1,0 +1,316 @@
+/* =========================================
+   NETBRIDGE MERCHANT DASHBOARD
+   ========================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #263449;
+    background: #f5f7fb;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: #f5f7fb;
+    color: #263449;
+}
+
+[data-state="error"] {
+    display: block;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-left: 4px solid #c62828;
+    border-radius: 6px;
+    background: #fff0f0;
+    color: #a11919 !important;
+    font-weight: 700;
+}
+
+
+/* HEADER */
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 5%;
+    background: #ffffff;
+    border-bottom: 1px solid #e1e7ef;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.logo {
+    display: block;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    object-fit: cover;
+}
+
+.topbar h1 {
+    margin: 0;
+    color: #1674d1;
+}
+
+.topbar p {
+    margin: 5px 0 0;
+    color: #64748b;
+}
+
+.nav-link {
+    color: #1674d1;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.nav-link:hover {
+    text-decoration: underline;
+}
+
+
+/* DASHBOARD LAYOUT */
+
+.dashboard {
+    width: min(1100px, 92%);
+    margin: 30px auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.card {
+    min-width: 0;
+    padding: 22px;
+    background: #ffffff;
+    border: 1px solid #e1e7ef;
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(25, 45, 75, 0.05);
+}
+
+.card h2 {
+    margin-top: 0;
+    color: #263449;
+}
+
+.card h3 {
+    color: #263449;
+}
+
+.card p {
+    line-height: 1.6;
+}
+
+.muted {
+    color: #64748b;
+}
+
+
+/* WALLET */
+
+#merchantBalance {
+    margin: 12px 0;
+    color: #15803d;
+    font-size: clamp(26px, 4vw, 36px);
+    overflow-wrap: anywhere;
+}
+
+#merchantId {
+    overflow-wrap: anywhere;
+}
+
+
+/* FORMS */
+
+label {
+    display: block;
+    margin: 16px 0 7px;
+    color: #334155;
+    font-weight: 600;
+}
+
+input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    color: #263449;
+    background: #ffffff;
+    font: inherit;
+}
+
+input:focus {
+    outline: 2px solid #93c5fd;
+    border-color: #1674d1;
+}
+
+
+/* BUTTONS */
+
+button {
+    margin-top: 14px;
+    padding: 11px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #1674d1;
+    color: #ffffff;
+    font-weight: 600;
+    cursor: pointer;
+    font: inherit;
+}
+
+button:hover {
+    background: #105eae;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
+/* MESSAGES */
+
+.message {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+#deviceRegistrationMessage {
+    color: #334155;
+}
+
+#qrMessage {
+    color: #334155;
+}
+
+#historyMessage {
+    color: #334155;
+}
+
+
+/* QR CODE */
+
+#qrContainer {
+    margin-top: 20px;
+    text-align: center;
+}
+
+#qrContainer hr {
+    margin: 20px 0;
+    border: 0;
+    border-top: 1px solid #e2e8f0;
+}
+
+#generatedAmount {
+    color: #15803d;
+}
+
+#merchantQrImage {
+    display: block;
+    width: min(100%, 320px);
+    height: auto;
+    margin: 18px auto;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+
+/* TRANSACTION HISTORY */
+
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    min-width: 320px;
+    margin-top: 15px;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+th,
+td {
+    padding: 12px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+th {
+    background: #f1f5f9;
+    color: #334155;
+}
+
+td {
+    color: #475569;
+}
+
+
+/* FOOTER */
+
+footer {
+    padding: 24px;
+    text-align: center;
+    line-height: 1.8;
+    color: #64748b;
+}
+
+
+/* HIDDEN ELEMENTS */
+
+[hidden] {
+    display: none !important;
+}
+
+
+/* RESPONSIVE LAYOUT */
+
+@media (max-width: 720px) {
+    .dashboard {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .card {
+        padding: 17px;
+    }
+}
+
+@media (max-width: 380px) {
+    .dashboard {
+        width: 94%;
+    }
+
+    .card {
+        padding: 14px;
+    }
+
+    button {
+        width: 100%;
+    }
+}
