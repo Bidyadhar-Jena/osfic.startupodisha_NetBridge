@@ -8,6 +8,26 @@ const AUTHENTICATOR_CONNECTED_KEY = "netbridge.authenticator.connected.v2";
 const AUTHENTICATOR_SESSION_KEY = "netbridge.authenticator.server-session.customer.v1";
 const OFFLINE_CREDENTIAL_KEY = `netbridge.offline.totp.${CUSTOMER_ID}.v1`;
 const AUTHENTICATOR_REFRESH_KEY = "netbridge.authenticator.refresh-on-connect.v1";
+const IS_ANDROID_CLIENT = /Android/i.test(navigator.userAgent);
+
+function shouldTryNetBridgeServer() {
+    // Android can be connected to the local NetBridge Wi-Fi while Android
+    // reports navigator.onLine=false because that Wi-Fi has no internet.
+    return navigator.onLine || IS_ANDROID_CLIENT;
+}
+
+async function updateAndroidConnectionIndicator() {
+    if (!IS_ANDROID_CLIENT) return;
+    const status = document.getElementById("connectionStatus");
+    if (!status) return;
+    try {
+        const response = await fetchWithTimeout("/api/health", { cache: "no-store" }, 8000);
+        if (!response.ok) throw new Error("NetBridge server unavailable");
+        status.textContent = "Simulation Mode · NetBridge connected";
+    } catch (_) {
+        status.textContent = "Simulation Mode · NetBridge server unavailable";
+    }
+}
 
 let decodedMerchantQrText = null;
 let decodedMerchantQrPayload = null;
@@ -21,6 +41,26 @@ let paymentCompleted = false;
 let customerHistoryPollTimer = null;
 let pendingFarSyncPin = null;
 let farPaymentSyncInProgress = false;
+let jsQrLoaderPromise = null;
+
+function ensureJsQRLoaded() {
+    if (typeof window.jsQR === "function") return Promise.resolve();
+    if (jsQrLoaderPromise) return jsQrLoaderPromise;
+
+    jsQrLoaderPromise = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "/static/vendor/jsQR.js";
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => {
+            jsQrLoaderPromise = null;
+            reject(new Error("Could not load the QR decoder. Check the NetBridge connection and try again."));
+        };
+        document.head.appendChild(script);
+    });
+
+    return jsQrLoaderPromise;
+}
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
     const controller = new AbortController();
@@ -96,7 +136,7 @@ async function refreshCustomerView({ button = null, pullIndicator = false } = {}
 }
 
 function isNetworkFailure(error) {
-    return error instanceof TypeError || error?.name === "AbortError" || !navigator.onLine;
+    return error instanceof TypeError || error?.name === "AbortError" || (!navigator.onLine && !IS_ANDROID_CLIENT);
 }
 
 async function syncAuthenticatorServerSession() {
@@ -223,7 +263,7 @@ async function loadCustomerWallet() {
         message.dataset.state = "info";
     }
 
-    if (!navigator.onLine) return;
+    if (!shouldTryNetBridgeServer()) return;
 
     try {
         const response = await fetchWithTimeout(
@@ -318,7 +358,7 @@ async function loadCustomerHistory() {
     };
 
     render(NetBridgeOfflineStore.getTransactions(CUSTOMER_ID));
-    if (!navigator.onLine) return NetBridgeOfflineStore.getTransactions(CUSTOMER_ID);
+    if (!shouldTryNetBridgeServer()) return NetBridgeOfflineStore.getTransactions(CUSTOMER_ID);
     try {
         const response = await fetchWithTimeout(
             `/api/wallets/${encodeURIComponent(CUSTOMER_ID)}/transactions`,
@@ -366,8 +406,8 @@ function newFarPaymentId() {
 
 async function syncPendingFarPayments(pin) {
     if (farPaymentSyncInProgress) return;
-    if (!navigator.onLine) {
-        showMessage("farPaymentMessage", "Still offline. The transfer remains pending on this phone; the receiver has not received it.", "info");
+    if (!shouldTryNetBridgeServer()) {
+        showMessage("farPaymentMessage", "No server connection. The transfer remains pending on this phone; the receiver has not received it.", "info");
         return;
     }
     const queued = NetBridgeOfflineStore.getPendingFarPayments(CUSTOMER_ID);
@@ -453,6 +493,7 @@ async function submitFarPayment(event) {
     try {
         const otpValid = await NetBridgeOfflineTOTP.verifyAndConsume(CUSTOMER_ID, pin, otp);
         if (!otpValid) throw new Error("Authenticator code is incorrect, expired, or already used. Wait for the next code.");
+        let paymentQueued = false;
         const payment = {
             recipient_upi_id: recipient,
             amount_paise: amountPaise,
@@ -460,38 +501,46 @@ async function submitFarPayment(event) {
             created_at: Math.floor(Date.now() / 1000)
         };
 
-        if (navigator.onLine) {
+        if (shouldTryNetBridgeServer()) {
+            let result;
             try {
-                const result = await apiPost("/api/far-payments", {
+                result = await apiPost("/api/far-payments", {
                     sender_id: CUSTOMER_ID,
                     recipient_upi_id: recipient,
                     amount_paise: amountPaise,
                     transaction_id: payment.transaction_id,
                     pin
-                }, 15000);
-                NetBridgeOfflineStore.seedFromServer(CUSTOMER_ID, Number(result.sender_balance_paise));
-                NetBridgePaymentFeedback.paymentSent();
-                await Promise.all([loadCustomerWallet(), loadCustomerHistory()]);
-                showMessage("farPaymentMessage", `Payment delivered to ${recipient}. Receiver needs no code or QR scan.`, "success");
+                }, 60000);
             } catch (error) {
                 if (!(error instanceof TypeError) && error?.name !== "AbortError") throw error;
                 NetBridgeOfflineStore.queueFarPayment(CUSTOMER_ID, payment);
                 pendingFarSyncPin = pin;
+                paymentQueued = true;
                 renderPendingFarPayments();
-                showMessage("farPaymentMessage", "Connection to NetBridge was lost. Payment is queued on this phone; the recipient has not received it yet.", "info");
+                showMessage("farPaymentMessage", "The server did not confirm the result in time. This payment is saved as pending and will be retried safely; check the receiver's history before submitting another payment.", "info");
+            }
+            if (result) {
+                NetBridgeOfflineStore.seedFromServer(CUSTOMER_ID, Number(result.sender_balance_paise));
+                NetBridgePaymentFeedback.paymentSent();
+                void updateAndroidConnectionIndicator();
+                showMessage("farPaymentMessage", `Payment delivered to ${recipient}. Receiver needs no code or QR scan.`, "success");
+                // Payment confirmation is authoritative. A slow wallet/history
+                // refresh must not turn a delivered payment into a queued one.
+                await Promise.allSettled([loadCustomerWallet(), loadCustomerHistory()]);
             }
         } else {
             NetBridgeOfflineStore.queueFarPayment(CUSTOMER_ID, payment);
             pendingFarSyncPin = pin;
+            paymentQueued = true;
             renderPendingFarPayments();
             showMessage("farPaymentMessage", "Payment queued offline. The recipient has not received it. NetBridge will sync it when this phone can reach the server.", "info");
         }
         if (byId("farPaymentAmount")) byId("farPaymentAmount").value = "";
         if (byId("farPaymentOtp")) byId("farPaymentOtp").value = "";
         if (byId("farPaymentPin")) byId("farPaymentPin").value = "";
-        if (NetBridgeOfflineStore.getPendingFarPayments(CUSTOMER_ID).length) {
+        if (!paymentQueued && NetBridgeOfflineStore.getPendingFarPayments(CUSTOMER_ID).length) {
             await loadCustomerWallet();
-            if (navigator.onLine) void syncPendingFarPayments(pendingFarSyncPin || pin);
+            if (shouldTryNetBridgeServer()) void syncPendingFarPayments(pendingFarSyncPin || pin);
         }
     } catch (error) {
         showMessage("farPaymentMessage", error.message, "error");
@@ -579,7 +628,7 @@ async function connectAuthenticator() {
 
     try {
         if (localStorage.getItem(AUTHENTICATOR_REFRESH_KEY) === "true") {
-            if (!navigator.onLine) throw new TypeError("Authenticator refresh requires a connection to the NetBridge server.");
+            if (!shouldTryNetBridgeServer()) throw new TypeError("Authenticator refresh requires a connection to the NetBridge server.");
             await apiPost("/api/authenticator/refresh", { user_id: CUSTOMER_ID, pin });
             localStorage.removeItem(AUTHENTICATOR_REFRESH_KEY);
             localStorage.removeItem(OFFLINE_CREDENTIAL_KEY);
@@ -613,7 +662,7 @@ async function connectAuthenticator() {
             return;
         }
 
-        if (!navigator.onLine) throw new TypeError("Offline mode");
+        if (!shouldTryNetBridgeServer()) throw new TypeError("Offline mode");
         const result = await apiPost("/api/authenticator/status", {
             user_id: CUSTOMER_ID,
             pin
@@ -703,7 +752,7 @@ async function generateAuthenticatorQr() {
             return;
         }
 
-        if (!navigator.onLine) throw new TypeError("Offline mode");
+        if (!shouldTryNetBridgeServer()) throw new TypeError("Offline mode");
 
         const result = await apiPost(
             "/api/authenticator/enroll",
@@ -875,7 +924,7 @@ async function confirmAuthenticator() {
             return;
         }
 
-        if (!navigator.onLine) throw new TypeError("Offline mode");
+        if (!shouldTryNetBridgeServer()) throw new TypeError("Offline mode");
 
         const result = await apiPost(
             "/api/authenticator/confirm",
@@ -1247,6 +1296,7 @@ async function decodeQrImage(file) {
     let raw = await decodeImageWithBarcodeDetector(file);
 
     if (!raw) {
+        await ensureJsQRLoaded();
         raw = await decodeImageWithJsQR(file);
     }
 
@@ -1369,19 +1419,15 @@ async function startCameraScanner() {
 
     const nativeQrAvailable = "BarcodeDetector" in window;
 
-    const jsQrAvailable =
-        typeof window.jsQR === "function";
-
-    if (!nativeQrAvailable && !jsQrAvailable) {
-        showMessage(
-            "customerQrMessage",
-            "No QR decoder is available in this browser. Use a browser with BarcodeDetector support or load the local jsQR decoder.",
-            "error"
-        );
-
-        return;
+    if (!nativeQrAvailable) {
+        showMessage("customerQrMessage", "Preparing the QR scanner…", "info");
+        try {
+            await ensureJsQRLoaded();
+        } catch (error) {
+            showMessage("customerQrMessage", error.message, "error");
+            return;
+        }
     }
-
     try {
         cameraStream =
             await navigator.mediaDevices.getUserMedia({
@@ -1467,7 +1513,15 @@ async function startCameraScanner() {
                             }
                         }
 
-                        if (!decodedText && jsQrAvailable) {
+                        if (!decodedText && typeof window.jsQR !== "function") {
+                            try {
+                                await ensureJsQRLoaded();
+                            } catch (error) {
+                                console.warn("QR fallback decoder could not load:", error);
+                            }
+                        }
+
+                        if (!decodedText && typeof window.jsQR === "function") {
                             canvas.width = video.videoWidth;
                             canvas.height = video.videoHeight;
 
@@ -1638,8 +1692,21 @@ async function authorizeCustomerPayment() {
 ========================================== */
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const authServerRestarted = await syncAuthenticatorServerSession();
-    Promise.allSettled([loadCustomerWallet(), loadCustomerHistory()]).finally(hideInitialLoader);
+    void updateAndroidConnectionIndicator();
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") void updateAndroidConnectionIndicator();
+    });
+    const sessionCheck = syncAuthenticatorServerSession();
+    const initialDataLoad = Promise.allSettled([
+        loadCustomerWallet(),
+        loadCustomerHistory()
+    ]);
+    const authServerRestarted = await sessionCheck;
+    await initialDataLoad;
+    if (authServerRestarted) {
+        await Promise.allSettled([loadCustomerWallet(), loadCustomerHistory()]);
+    }
+    hideInitialLoader();
     renderPendingFarPayments();
     if (NetBridgeOfflineStore.getPendingFarPayments(CUSTOMER_ID).length) {
         showMessage("farPaymentMessage", "A far payment is still pending. The receiver has not received it yet.", "info");
