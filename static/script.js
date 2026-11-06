@@ -183,7 +183,7 @@ function formatTransactionStatus(item) {
     return status.replaceAll("_", " ");
 }
 
-async function apiPost(url, body) {
+async function apiPost(url, body, timeoutMs = 2500) {
     const response = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
@@ -191,7 +191,7 @@ async function apiPost(url, body) {
         },
         cache: "no-store",
         body: JSON.stringify(body)
-    });
+    }, timeoutMs);
 
     const data = await response.json().catch(() => ({}));
 
@@ -392,7 +392,7 @@ async function syncPendingFarPayments(pin) {
                 amount_paise: payment.amount_paise,
                 transaction_id: payment.transaction_id,
                 pin
-            });
+            }, 15000);
             NetBridgeOfflineStore.completeFarPayment(
                 CUSTOMER_ID,
                 payment.transaction_id,
@@ -468,7 +468,7 @@ async function submitFarPayment(event) {
                     amount_paise: amountPaise,
                     transaction_id: payment.transaction_id,
                     pin
-                });
+                }, 15000);
                 NetBridgeOfflineStore.seedFromServer(CUSTOMER_ID, Number(result.sender_balance_paise));
                 NetBridgePaymentFeedback.paymentSent();
                 await Promise.all([loadCustomerWallet(), loadCustomerHistory()]);
