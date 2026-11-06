@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#315bea">
+    <title>NetBridge | Receiver Wallet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=21">
+    <style>
+        .receiver-page { max-width: 860px; margin: 0 auto; padding: 24px; }
+        .receiver-brand { display:flex; align-items:center; gap:14px; margin:16px 0 24px; }
+        .receiver-mark { width:54px; height:54px; display:grid; place-items:center; border-radius:16px; background:#1674d1; color:white; font-size:28px; font-weight:800; }
+        .receiver-mark + div h1 { margin:0; }
+        .receiver-mark + div p { margin:0; color:#64748b; }
+        .receiver-balance { font-size:2.6rem; font-weight:750; color:#1674d1; }
+        .receiver-history { padding-left:0; list-style:none; }
+        .receiver-history li { padding:12px 0; border-bottom:1px solid #e1e7ef; }
+    </style>
+    <script src="{{ url_for('static', filename='far_wallet.js') }}?v=1" defer></script>
+</head>
+<body>
+<main class="receiver-page" id="receiverWallet" data-wallet-id="{{ wallet_id }}" data-upi-id="{{ upi_id }}">
+    <header class="receiver-brand">
+        <div class="receiver-mark" aria-hidden="true">N</div>
+        <div><h1>NetBridge</h1><p>Receiver wallet · Simulation only</p></div>
+    </header>
+    <section class="card">
+        <p class="eyebrow">YOUR NETBRIDGE ID</p>
+        <h2>{{ upi_id }}</h2>
+        <p class="muted">A sender can enter this ID in NetBridge. No QR scan or confirmation code is required from you.</p>
+    </section>
+    <section class="card">
+        <h2>Available demo balance</h2>
+        <div id="receiverBalance" class="receiver-balance" aria-live="polite">Loading…</div>
+        <p id="receiverStatus" class="message" role="status" aria-live="polite">Connecting to NetBridge…</p>
+        <button id="receiverRefresh" type="button">Refresh</button>
+    </section>
+    <section class="card">
+        <h2>Recent activity</h2>
+        <ul id="receiverHistory" class="receiver-history"><li>Loading activity…</li></ul>
+    </section>
+    <p class="simulation-warning"><strong>Simulation only:</strong> no real UPI or bank transfer occurs. A payment appears here only after the sender's pending transfer reaches the NetBridge server.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#315bea">
+    <meta name="description" content="NetBridge simulation-only offline payment research prototype.">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <title>NetBridge | Offline Payments</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}?v=21">
+</head>
+
+<body class="merchant-page">
+
+<div id="appLoadingOverlay" class="app-loading-overlay" role="status" aria-live="polite" aria-label="Loading NetBridge">
+    <div class="app-loading-card">
+        <span class="loader-spinner" aria-hidden="true"></span>
+        <strong>Loading your wallet</strong>
+        <span>Preparing this device…</span>
+    </div>
+</div>
+<div id="pullRefreshIndicator" class="pull-refresh-indicator" aria-live="polite" aria-hidden="true">
+    <span class="loader-spinner" aria-hidden="true"></span><span>Pull to refresh</span>
+</div>
+
+<header class="topbar">
+    <div class="brand">
+        <div>
+            <h1>NetBridge</h1>
+            <p>Payments beyond connectivity</p>
+        </div>
+    </div>
+
+    <div class="status">
+        <span class="status-dot"></span>
+        <span id="connectionStatus">Simulation Mode · Checking connection</span>
+    </div>
+</header>
+
+<main class="container">
+
+    <!-- WELCOME -->
+    <section class="welcome">
+        <p class="eyebrow">OFFLINE PAYMENT TECHNOLOGY</p>
+        <h2>Your money.<br><span>Your connection.</span></h2>
+        <p class="subtitle">
+            Explore a simulated payment experience designed for
+            environments with limited connectivity.
+        </p>
+    </section>
+
+    <!-- CUSTOMER WALLET -->
+    <section class="balance-grid">
+        <article class="card balance-card">
+            <p>Customer Wallet</p>
+            <h2 id="customerBalance" class="skeleton-text" aria-label="Loading balance">Loading...</h2>
+            <span>Demo account · CUSTOMER001</span>
+            <div id="walletMessage" class="message" role="status" aria-live="polite"></div>
+        </article>
+    </section>
+
+    <!-- AUTHENTICATOR STATUS -->
+    <section class="card device-card" id="authenticatorSection">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">ACCOUNT SECURITY</p>
+                <h2>Google Authenticator</h2>
+            </div>
+            <div class="payment-icon">🔐</div>
+        </div>
+
+        <p class="subtitle" id="authenticatorIntro">
+            Connect Google Authenticator to secure your demo customer wallet.
+        </p>
+
+        <p id="authenticatorStatusText">
+            Authenticator connection required.
+        </p>
+
+        <button type="button" id="openAuthenticatorButton">
+            Connect Authenticator
+        </button>
+    </section>
+
+    <!-- AUTHENTICATOR MODAL -->
+    <div id="authenticatorModal" class="auth-modal" hidden>
+        <div class="auth-modal-backdrop"></div>
+
+        <div class="auth-modal-content">
+            <button type="button"
+                    id="closeAuthenticatorModal"
+                    class="auth-modal-close">&times;</button>
+
+            <h2>Connect Authenticator</h2>
+
+            <div id="authenticatorConnectPanel">
+                <p>After NetBridge restarts, enter your four-digit demo PIN and tap the button below. The fresh Authenticator QR appears after the PIN is accepted. Do not reuse a bank or UPI PIN.</p>
+
+                <input
+                    type="password"
+                    id="authenticatorPin"
+                    placeholder="Enter customer PIN"
+                    autocomplete="current-password"
+                >
+
+                <div id="authenticatorExistingOtpPanel" hidden>
+                    <p>Enter one current code to unlock this phone. Use the next code for a payment.</p>
+                    <input
+                        type="text"
+                        id="authenticatorExistingOtp"
+                        placeholder="Current 6-digit Authenticator code"
+                        inputmode="numeric"
+                        maxlength="6"
+                        autocomplete="one-time-code"
+                    >
+                </div>
+
+                <button type="button" id="connectAuthenticatorButton">
+                    Verify PIN &amp; Show Authenticator QR
+                </button>
+            </div>
+
+            <div id="authenticatorSetupPanel" hidden>
+                <p>Scan this QR code with your authenticator app.</p>
+
+                <div id="authenticator-qr-container">
+                    <div id="authenticator-qr" role="img" aria-label="Authenticator setup QR"></div>
+                    <p>Or enter this setup key manually in your Authenticator app:</p>
+                    <code id="authenticator-secret-code" aria-label="Authenticator setup key"></code>
+                </div>
+
+                <button type="button" id="generateAuthenticatorButton">
+                    Generate QR
+                </button>
+
+                <input
+                    type="text"
+                    id="authenticatorOtp"
+                    placeholder="Enter 6-digit OTP"
+                    inputmode="numeric"
+                    maxlength="6"
+                    autocomplete="one-time-code"
+                >
+
+                <button type="button" id="confirmAuthenticatorButton">
+                    Verify OTP
+                </button>
+            </div>
+
+            <div id="authenticatorConnectedPanel" hidden>
+                <p>Authenticator connected successfully.</p>
+            </div>
+
+            <p id="authenticatorMessage"
+               role="status"
+               aria-live="polite"></p>
+        </div>
+    </div>
+
+    {% if request.host.split(':')[0] in ['127.0.0.1', 'localhost'] %}
+    <section class="card desktop-scan-notice">
+        <div class="section-heading">
+            <div><p class="eyebrow">ANDROID CUSTOMER APP</p><h2>Scan from your phone</h2></div>
+            <div class="payment-icon">▦</div>
+        </div>
+        <p class="subtitle">Open NetBridge on Android using this PC's network address to scan the merchant request QR and show a confirmation code.</p>
+    </section>
+    {% else %}
+    <!-- CUSTOMER QR PAYMENT (Android/LAN site only) -->
+    <section class="card payment-card" id="customerQrSection">
+
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">OFFLINE PAYMENT</p>
+                <h2>Scan Merchant QR</h2>
+            </div>
+            <div class="payment-icon">▦</div>
+        </div>
+
+        <p class="subtitle">
+            Scan the merchant's request QR, review the amount, and approve it with your PIN and Authenticator code.
+            After approval, show the merchant your 10-character confirmation code.
+        </p>
+
+        <div class="qr-actions">
+            <button type="button" id="startQrCameraButton">
+                Open Camera
+            </button>
+
+            <button type="button"
+                    id="stopQrCameraButton"
+                    disabled>
+                Stop Camera
+            </button>
+        </div>
+
+        <div id="qrScannerPreview" class="scanner-preview" aria-label="QR scanning preview">
+            <video id="qrCamera" autoplay playsinline muted></video>
+            <div class="scanner-frame" aria-hidden="true"><span></span></div>
+        </div>
+
+        <label for="customerQrUpload">Upload merchant QR image</label>
+
+        <input
+            id="customerQrUpload"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+        >
+
+        <div id="customerQrPreview"></div>
+
+        <div id="customerQrMessage"
+             class="message"
+             role="status"
+             aria-live="polite">
+            Choose Open Camera or upload a QR image.
+        </div>
+
+        <!-- PAYMENT DETAILS -->
+        <div id="customerPaymentDetails" hidden>
+            <hr>
+
+            <h3>Payment details</h3>
+
+            <p>
+                Merchant ID:
+                <strong id="qrMerchantId">—</strong>
+            </p>
+
+            <p>
+                Merchant device:
+                <code id="qrReceiverDevice">—</code>
+            </p>
+
+            <p>
+                Requested amount:
+                <strong id="qrPaymentAmount">—</strong>
+            </p>
+
+            <!-- CUSTOMER PIN -->
+            <label for="qrCustomerPin">Customer demo PIN</label>
+
+            <input
+                id="qrCustomerPin"
+                type="password"
+                inputmode="numeric"
+                pattern="[0-9]{4}"
+                minlength="4"
+                maxlength="4"
+                autocomplete="off"
+                placeholder="Enter customer PIN"
+            >
+
+            <!-- PAYMENT AUTHENTICATOR OTP -->
+            <label for="paymentAuthenticatorOtp">
+                Google Authenticator OTP
+            </label>
+
+            <input
+                type="text"
+                id="paymentAuthenticatorOtp"
+                placeholder="Enter 6-digit Google Authenticator code"
+                inputmode="numeric"
+                pattern="[0-9]{6}"
+                minlength="6"
+                maxlength="6"
+                autocomplete="one-time-code"
+            >
+
+            <!-- CUSTOMER APPROVAL -->
+            <label class="approval-label">
+                <input type="checkbox" id="approveCustomerPayment">
+
+                I have checked the merchant and amount and approve this
+                simulated payment request.
+            </label>
+
+            <button
+                type="button"
+                id="authorizeCustomerPaymentButton"
+                disabled>
+                Authorize Payment
+            </button>
+
+            <div id="qrPaymentMessage"
+                 class="message"
+                 role="status"
+                 aria-live="polite">
+            </div>
+        </div>
+
+        <div id="customerReceiptPanel" hidden class="receipt-panel">
+            <hr>
+            <h3>Show this confirmation code to the merchant</h3>
+            <p>Ask the merchant to type this code into the merchant dashboard.</p>
+            <output id="customerReceiptCode" class="manual-receipt-code" aria-label="10-character payment confirmation code">---------- </output>
+            <p class="prototype-note">Simulation only. This code matches the active request but is not cryptographic proof or a real payment.</p>
+        </div>
+
+        <p class="prototype-note">
+            Simulation only. While NetBridge is available, open both dashboards once and install the customer app so each browser caches its files. Afterwards, the customer scans the merchant's request QR face to face; the merchant types the customer's 10-character confirmation code. The exchange works without internet, Wi-Fi or a running server. Each device keeps its own demo balance and history; they do not synchronize. No real money is transferred.
+        </p>
+    </section>
+    {% endif %}
+
+    <!-- FAR PAYMENT SIMULATION: typed NetBridge ID, no QR or receiver code -->
+    <section class="card far-payment-card" id="farPaymentCard">
+        <p class="eyebrow">FAR PAYMENT · SIMULATION</p>
+        <h2>Send to a NetBridge ID</h2>
+        <p class="muted">Enter the recipient's NetBridge ID and amount. No QR scan or receiver code is needed. If you are offline, this phone saves the payment as pending; the recipient gets it only after the sender syncs with NetBridge. If you close this app while offline, enter your PIN and tap Sync when you return.</p>
+        <p class="muted">Demo recipient IDs: <strong>merchant@netbridge</strong> or <strong>customer2@netbridge</strong>. <a href="/far-wallet/customer2" target="_blank" rel="noopener">Open Customer 2's receiver wallet</a>.</p>
+        <form id="farPaymentForm">
+            <label for="farRecipientId">Recipient NetBridge ID</label>
+            <input id="farRecipientId" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="merchant@netbridge" required>
+            <label for="farPaymentAmount">Amount (INR)</label>
+            <input id="farPaymentAmount" type="number" min="0.01" max="5000" step="0.01" placeholder="100.00" required>
+            <label for="farPaymentPin">Customer demo PIN</label>
+            <input id="farPaymentPin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" placeholder="Enter 4-digit demo PIN" required>
+            <label for="farPaymentOtp">Current 6-digit Authenticator code</label>
+            <input id="farPaymentOtp" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" placeholder="Enter current code" required>
+            <button id="farPaymentSubmit" type="submit">Send Far Payment</button>
+        </form>
+        <button id="syncFarPaymentsButton" type="button" hidden>Enter PIN and Sync Pending Payments</button>
+        <p id="farPaymentMessage" class="message" role="status" aria-live="polite"></p>
+        <div id="farPendingPayments" aria-live="polite"></div>
+        <div class="simulation-warning"><strong>Simulation only:</strong> this NetBridge ID is fictional. No real UPI or bank transfer occurs.</div>
+    </section>
+
+    <!-- TRANSACTION HISTORY -->
+    <section class="card history-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">TRANSACTION RECORDS</p>
+                <h2>Recent Activity</h2>
+            </div>
+
+            <button id="refreshButton"
+                    class="refresh-button"
+                    type="button">
+                ↻ Refresh
+            </button>
+        </div>
+
+    <div id="transactionHistory" aria-busy="true">
+        <div class="history-skeleton" aria-label="Loading transactions"><i></i><i></i><i></i></div>
+        </div>
+    </section>
+
+    <!-- PROTOTYPE NOTICE -->
+    <section class="card info-card">
+        <div class="info-icon">ⓘ</div>
+
+        <div>
+            <h3>Prototype notice</h3>
+
+            <p>
+                This application uses fictional, device-local wallet balances. It does not transfer real money or connect to a bank, UPI, or payment network. The customer scans the merchant request QR, then the merchant types a short confirmation code after approval. Offline records stay on their own device and cannot prevent spending from another copy of the demo wallet.
+            </p>
+        </div>
+    </section>
+
+    <section class="card" id="pwaInstallCard" style="margin-top:18px">
+        <h2 id="installNetBridgeHeading">Install NetBridge</h2>
+        <p class="subtitle" id="installNetBridgeDescription">Open and install NetBridge while it is available, then the cached customer app can load without the server. The merchant PC also needs to open the dashboard once before both devices go offline.</p>
+        <button type="button" id="installPwaButton">Install NetBridge</button>
+        <p id="pwaInstallMessage" role="status" aria-live="polite">If no install prompt appears, open your browser menu and choose Install app or Add to Home screen.</p>
+    </section>
+
+</main>
+
+<footer>
+    <p>NETBRIDGE © 2026 · Offline Payment Research Prototype</p>
+    <p>Local development · No real funds</p>
+</footer>
+
+<script src="{{ url_for('static', filename='vendor/jsQR.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/qrcode.min.js') }}"></script>
+<script src="{{ url_for('static', filename='offline_totp.js') }}"></script>
+<script src="{{ url_for('static', filename='offline_store.js') }}"></script>
+<script src="{{ url_for('static', filename='payment_feedback.js') }}?v=1"></script>
+
+    <script src="{{ url_for('static', filename='offline_receipt_code.js') }}?v=2"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=22"></script>
+<script>
+(() => {
+    const status = document.getElementById('connectionStatus');
+    const installCard = document.getElementById('pwaInstallCard');
+    const installButton = document.getElementById('installPwaButton');
+    const installMessage = document.getElementById('pwaInstallMessage');
+    let installPrompt = null;
+
+    const isLocalPc = ['127.0.0.1', 'localhost'].includes(window.location.hostname);
+    const installHeading = document.getElementById('installNetBridgeHeading');
+    const installDescription = document.getElementById('installNetBridgeDescription');
+    if (installHeading) installHeading.textContent = isLocalPc
+        ? 'Install NetBridge on Windows' : 'Install NetBridge on Android';
+    if (installButton) installButton.textContent = isLocalPc
+        ? 'Install on Windows' : 'Install on Android';
+    if (installDescription) installDescription.textContent = isLocalPc
+        ? 'Open the merchant dashboard once while NetBridge is available so this browser caches it. The cached dashboard can then create and verify demo QR payments without app.py.'
+        : 'Install the customer app while NetBridge is available. After its first setup, the cached app can load the local demo wallet and scan QRs without internet or a shared Wi-Fi network.';
+
+    async function updateConnection() {
+        if (!status) return;
+        if (!navigator.onLine) {
+            status.textContent = 'Simulation Mode · Offline';
+            return;
+        }
+        try {
+            const response = await fetch('/api/health', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Server unavailable');
+            status.textContent = 'Simulation Mode · NetBridge connected';
+        } catch (_) {
+            status.textContent = 'Simulation Mode · NetBridge server unavailable';
+        }
+    }
+    window.addEventListener('online', updateConnection);
+    window.addEventListener('offline', updateConnection);
+    updateConnection();
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(() => {
+                    if (installMessage && !isLocalPc) installMessage.textContent =
+                        'Offline app shell cached. Complete Authenticator setup before going offline.';
+                })
+                .catch(error => console.warn('Service worker registration failed:', error));
+        });
+    }
+
+    window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        installPrompt = event;
+        if (installCard) installCard.hidden = false;
+        if (installButton) installButton.disabled = false;
+    });
+
+    window.addEventListener('appinstalled', () => {
+        if (installMessage) installMessage.textContent =
+            'NetBridge is installed. Open it from your Android home screen.';
+        if (installButton) installButton.hidden = true;
+    });
+
+    if (installButton) {
+        installButton.addEventListener('click', async () => {
+            if (!installPrompt) {
+                if (installMessage) installMessage.textContent =
+                    isLocalPc
+                        ? 'In Chrome or Edge, open ⋮ and choose Install NetBridge or Apps → Install this site as an app.'
+                        : 'In Chrome on Android, open ⋮ and choose Install app or Add to Home screen.';
+                return;
+            }
+            installPrompt.prompt();
+            const choice = await installPrompt.userChoice;
+            if (installMessage) installMessage.textContent =
+                choice.outcome === 'accepted' ? 'NetBridge installation accepted.' : 'Installation was dismissed.';
+            installPrompt = null;
+        });
+    }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#315bea">
+    <title>NetBridge | Merchant Dashboard</title>
+    <link rel="manifest" href="{{ url_for('static', filename='merchant.webmanifest') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='merchant.css') }}">
+
+    <style>
+        [hidden] { display: none !important; }
+        .manual-code-panel {
+            margin-top: 18px;
+            padding: 16px;
+            border: 1px solid #dce3f0;
+            border-radius: 14px;
+            background: #f8faff;
+        }
+.manual-code-note {
+            font-size: .9rem;
+            line-height: 1.5;
+            color: #586579;
+        }
+
+.simulation-warning {
+            padding: 12px;
+            margin-top: 14px;
+            border-left: 4px solid #e0a126;
+            background: #fff8e8;
+            border-radius: 8px;
+            line-height: 1.5;
+        }
+        .result-success {
+            border-left: 4px solid #15945b;
+            background: #effbf5;
+            padding: 14px;
+            border-radius: 8px;
+            margin-top: 14px;
+        }
+        .result-error {
+            border-left: 4px solid #c43d3d;
+            background: #fff1f1;
+            padding: 14px;
+            border-radius: 8px;
+            margin-top: 14px;
+        }
+        .manual-code-panel input {
+            display: block;
+            width: 100%;
+            max-width: 320px;
+            margin: 8px 0 12px;
+        }
+        .manual-code-panel button:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+    </style>
+
+    <script src="{{ url_for('static', filename='vendor/qrcode.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='offline_store.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='payment_feedback.js') }}?v=1" defer></script>
+    <script src="{{ url_for('static', filename='offline_receipt_code.js') }}?v=2" defer></script>
+
+    <script
+        src="{{ url_for('static', filename='merchant.js') }}?v=8"
+        defer
+    ></script>
+</head>
+
+<body class="merchant-page">
+
+<header class="topbar">
+    <div class="brand">
+        <svg class="logo" viewBox="0 0 192 192" role="img" aria-label="NetBridge logo">
+            <rect width="192" height="192" rx="28" fill="#315bea"/>
+            <rect x="22" y="22" width="148" height="148" rx="44" fill="#fff"/>
+            <path d="M55 143V49c0-8 10-11 15-4l49 66V49h20v94c0 8-10 11-15 4L75 81v62z" fill="#315bea"/>
+        </svg>
+        <div>
+            <h1>NetBridge</h1>
+            <p>Merchant Dashboard · Simulation Only</p>
+        </div>
+    </div>
+
+    <a href="/" class="nav-link">Customer Interface</a>
+</header>
+
+<main class="dashboard">
+
+    <!-- MERCHANT WALLET -->
+    <section class="card">
+        <h2>Merchant Wallet</h2>
+
+        <p class="muted">Merchant ID</p>
+        <strong id="merchantId">MERCHANT001</strong>
+
+        <p class="muted">Far payment NetBridge ID</p>
+        <strong id="merchantNetBridgeId">merchant@netbridge</strong>
+        <p class="muted">Share this ID with the sender. They enter it in NetBridge; you do not scan a QR or enter a code to receive this simulation payment. Keep this dashboard open and online to see delivered payments.</p>
+
+        <p class="muted">Available Simulated Balance</p>
+        <h2 id="merchantBalance" aria-live="polite">
+            Loading...
+        </h2>
+
+        <button id="refreshMerchantBalance" type="button">
+            Refresh Balance
+        </button>
+
+        <p id="balanceMessage" role="status"></p>
+    </section>
+
+
+    <!-- GENERATE PAYMENT QR -->
+    <section class="card qr-card">
+
+        <h2>Generate Payment QR</h2>
+
+        <p class="muted">
+            Enter the amount requested from the customer.
+            The customer scans this request QR on their phone, reviews
+            the amount, and approves it. Then they show you a short confirmation code.
+        </p>
+
+        <form id="merchantQrForm">
+
+            <label for="paymentAmount">
+                Payment Amount (INR)
+            </label>
+
+            <input
+                id="paymentAmount"
+                name="amount"
+                type="number"
+                min="0.01"
+                max="5000"
+                step="0.01"
+                placeholder="250.00"
+                required
+            >
+
+            <label for="qrMerchantPin">
+                Merchant demo PIN (do not use your bank or UPI PIN)
+            </label>
+
+            <input
+                id="qrMerchantPin"
+                name="pin"
+                type="password"
+                inputmode="numeric"
+                pattern="[0-9]{4}"
+                minlength="4"
+                maxlength="4"
+                autocomplete="current-password"
+                placeholder="Enter four-digit PIN"
+                required
+            >
+
+            <button id="generateQrButton" type="submit">
+                Generate Payment QR
+            </button>
+
+        </form>
+
+        <p
+            id="qrMessage"
+            class="message"
+            role="status"
+            aria-live="polite"
+        ></p>
+
+        <div id="qrContainer" hidden>
+
+            <hr>
+
+            <h3>Customer Payment QR</h3>
+
+            <p class="muted">Amount Requested</p>
+
+            <h2 id="generatedAmount">₹0.00</h2>
+
+            <img
+                id="merchantQrImage"
+                alt="NetBridge simulated payment QR"
+            >
+
+            <button id="downloadQrButton" type="button">
+                Download QR
+            </button>
+
+            <p class="manual-code-note">
+                Keep this request active while the customer scans it.
+                The request expires automatically.
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- MANUAL CUSTOMER CODE ENTRY; no receipt scanner on the merchant site -->
+    <section class="card" id="merchantManualReceipt">
+        <h2>Enter Customer Confirmation Code</h2>
+        <p class="muted">After approving the payment, the customer shows a 10-character code. Type it here to check it against the active request on this merchant device.</p>
+
+        <div class="manual-code-panel">
+            <p id="merchantCodeMessage" class="message" role="status" aria-live="polite">Generate a payment QR first.</p>
+
+            <label for="manualReceiptCode">Customer's 10-character code</label>
+            <input id="manualReceiptCode" type="text" inputmode="text" pattern="[A-Za-z0-9!@#$%*_\-]{10}" minlength="10" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Example: aB3!xY7_mQ" disabled>
+
+            <label for="acceptMerchantPin">Merchant demo PIN</label>
+            <input id="acceptMerchantPin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" placeholder="Enter four-digit PIN" disabled>
+
+            <button id="acceptCustomerReceiptButton" type="button" disabled>Verify Code & Record Simulation</button>
+            <div id="merchantAcceptanceResult" role="status" aria-live="polite" hidden></div>
+        </div>
+
+        <div class="simulation-warning"><strong>Simulation only:</strong> the code is checked against this device's active request and prevents reusing that request on this merchant device. It is not a bank confirmation or proof that real money moved. Customer and merchant balances and histories remain separate on their own devices.</div>
+    </section>
+
+
+    <!-- TRANSACTION HISTORY -->
+    <section class="card history-card">
+
+        <h2>Transaction History</h2>
+
+        <button
+            id="refreshMerchantHistory"
+            type="button"
+        >
+            Refresh History
+        </button>
+
+        <p
+            id="historyMessage"
+            class="message"
+            role="status"
+            aria-live="polite"
+        ></p>
+
+        <div class="table-wrapper">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Transaction</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody id="merchantTransactionHistory">
+                    <tr>
+                        <td colspan="3">
+                            Loading transactions...
+                        </td>
+                    </tr>
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</main>
+
+<footer>
+    NetBridge · Offline-payment research prototype
+    <br>
+    Simulation only · Real payments disabled
+</footer>
+
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .catch(error => console.warn('Service worker registration failed:', error));
+    });
+}
+</script>
+
+</body>
+</html>
