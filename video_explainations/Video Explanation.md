@@ -6,7 +6,7 @@
 Innovation Challenge (OSFIC)**, organised through OSFIC -- Startup
 Odisha.
 
--   **Problem domain:** Information Technology & Communication (ITC)
+-   **Problem domain:** Information & Communication Technology (ICT)
 -   **Project focus:** Exploring offline digital payment possibilities
     and addressing connectivity challenges.
 -   **Key considerations:** Accessibility, reliability, transaction
